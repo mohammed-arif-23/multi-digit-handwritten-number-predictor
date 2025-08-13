@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Camera Digit Capture</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; background: #000; color: #fff; font-family: Poppins, sans-serif; }
+        video, canvas { border: 2px solid #fff; border-radius: 16px; margin: 10px; }
+        button { margin: 10px; padding: 10px 20px; border-radius: 5px; border: none; background: #fff; color: #000; cursor: pointer; }
+        button:hover { background: #cfcfcf; }
+        #result { margin-top: 20px; color: #fff; }
+    </style>
+</head>
+<body>
+    <h1 style="margin-bottom: 10px;">Camera Digit Capture</h1>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100vw; max-width: 800px;">
+        <video id="video" width="700" height="350" autoplay style="margin-bottom: 16px;"></video>
+        <canvas id="canvas" width="700" height="350" style="display:none; margin-bottom: 16px;"></canvas>
+        <div style="display: flex; flex-direction: row; gap: 20px; justify-content: center;">
+            <button id="snap">Capture</button>
+            <button id="predict" disabled>Predict</button>
+            <button id="back">Back to Canvas</button>
+        </div>
+        <h2 id="result" style="min-height: 32px; margin-top: 24px; text-align: center;"></h2>
+    </div>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const snapBtn = document.getElementById('snap');
+        const predictBtn = document.getElementById('predict');
+        const backBtn = document.getElementById('back');
+        let captured = false;
+
+        // Start webcam
+        navigator.mediaDevices.getUserMedia({ video: { width: 560, height: 280 } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { alert('Camera access denied!'); });
+
+        snapBtn.onclick = () => {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.style.display = 'block';
+            video.style.display = 'none';
+            predictBtn.disabled = false;
+            captured = true;
+        };
+
+        predictBtn.onclick = async () => {
+            if (!captured) return;
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = [];
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const avg = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
+                data.push(avg / 255);
+            }
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: data})
+            });
+            const prediction = await response.json();
+            document.getElementById('result').textContent = "Prediction : " + prediction.Prediction + 
+            " Accuracy : " + (prediction.Accuracy*100).toFixed(2) + "%";
+        };
+
+        backBtn.onclick = () => {
+            window.location.href = '/';
+        };
+    </script>
+</body>
+</html> 
